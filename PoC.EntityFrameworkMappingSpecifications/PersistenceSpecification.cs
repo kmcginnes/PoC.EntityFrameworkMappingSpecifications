@@ -37,12 +37,6 @@ namespace PoC.EntityFrameworkMappingSpecifications
             {
                 Database.SetInitializer<CompanyContext>(null);
 
-                //int i = 0;
-                //for (;; i++)
-                //{
-
-                //}
-
                 using (new TransactionScope())
                 {
                     int id;

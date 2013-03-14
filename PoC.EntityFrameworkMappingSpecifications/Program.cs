@@ -29,13 +29,23 @@ namespace PoC.EntityFrameworkMappingSpecifications
         [Required]
         public int Age { get; set; }
         [Required]
-        public Address Address { get; set; }
+        public virtual Address Address { get; set; }
+
+        public override int GetHashCode()
+        {
+            return ContactId.GetHashCode();
+        }
     }
 
     public class Address
     {
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int AddressId { get; set; }
+
+        public override int GetHashCode()
+        {
+            return AddressId.GetHashCode();
+        }
     }
 
     public class CompanyContext : DbContext
