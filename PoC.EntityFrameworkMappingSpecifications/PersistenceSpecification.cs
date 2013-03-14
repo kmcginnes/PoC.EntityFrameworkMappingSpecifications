@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Entity;
 using System.Data.Entity.Migrations;
+using System.Data.Objects;
 using System.Data.SqlClient;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -43,7 +44,7 @@ namespace PoC.EntityFrameworkMappingSpecifications
                     using (var ctx = _createContext())
                     {
                         ctx.Database.CreateIfNotExists();
-                        var expected = CreateEntity();
+                        var expected = CreateEntity(ctx);
                         SetPropertiesOnEntity(expected);
 
                         SaveEntityToDb(ctx, expected);
@@ -125,11 +126,13 @@ namespace PoC.EntityFrameworkMappingSpecifications
             }
         }
 
-        private TEntity CreateEntity()
+        private TEntity CreateEntity(DbContext ctx)
         {
             Console.WriteLine("Creating instance of {0}", typeof (TEntity).Name);
-            var expected = Activator.CreateInstance<TEntity>();
-            return expected;
+            var entity = GetDbSet(ctx).Create<TEntity>();
+            var entry = ctx.Entry(entity);
+            var entityType = ObjectContext.GetObjectType(entity.GetType());
+            return entity;
         }
 
         private int GetKeyValue(TEntity expected)

@@ -35,6 +35,11 @@ namespace PoC.EntityFrameworkMappingSpecifications
         {
             return ContactId.GetHashCode();
         }
+
+        public override string ToString()
+        {
+            return string.Format("ContactId: {0}", ContactId);
+        }
     }
 
     public class Address
@@ -45,6 +50,11 @@ namespace PoC.EntityFrameworkMappingSpecifications
         public override int GetHashCode()
         {
             return AddressId.GetHashCode();
+        }
+
+        public override string ToString()
+        {
+            return string.Format("AddressId: {0}", AddressId);
         }
     }
 
