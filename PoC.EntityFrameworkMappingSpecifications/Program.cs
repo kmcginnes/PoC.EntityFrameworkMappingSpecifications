@@ -13,7 +13,7 @@ namespace PoC.EntityFrameworkMappingSpecifications
                 .WithKey(x => x.ContactId)
                 .CheckProperty(x => x.Name, "Kris McGinnes")
                 .CheckProperty(x => x.Age, 29)
-                .CheckProperty(x => x.Address, new Address())
+                .CheckReference(x => x.Address, new Address())
                 .VerifyMappings();
             Console.WriteLine("Press any key to quit...");
             Console.ReadKey();
