@@ -18,8 +18,7 @@ namespace PoC.EntityFrameworkMappingSpecifications
         private readonly Func<DbContext> _createContext;
         private readonly List<Property> _properties;
         private readonly List<Reference> _references;
-        private PropertyInfo _keyPropertyInfo;
-        private ReadOnlyMetadataCollection<EdmMember> _keyMembers;
+	    private ReadOnlyMetadataCollection<EdmMember> _keyMembers;
 
         public PersistenceSpecification(Func<DbContext> createContext)
         {
@@ -55,8 +54,6 @@ namespace PoC.EntityFrameworkMappingSpecifications
                     object[] id;
                     using (var ctx = _createContext())
                     {
-                        ctx.Database.CreateIfNotExists();
-
                         var objectContext = ((IObjectContextAdapter) ctx).ObjectContext;
                         var entitySet = objectContext.GetEntitySet<TEntity>();
                         _keyMembers = entitySet.ElementType.KeyMembers;
@@ -289,14 +286,6 @@ namespace PoC.EntityFrameworkMappingSpecifications
                     }
                 }
             }
-        }
-
-        public PersistenceSpecification<TEntity> WithKey<TProperty>(Expression<Func<TEntity, TProperty>> property)
-        {
-            var propertyName = GetPropertyName(property);
-            var propertyInfo = typeof (TEntity).GetProperty(propertyName);
-            _keyPropertyInfo = propertyInfo;
-            return this;
         }
     }
 

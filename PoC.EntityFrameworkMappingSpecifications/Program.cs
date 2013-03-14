@@ -9,8 +9,12 @@ namespace PoC.EntityFrameworkMappingSpecifications
     {
         static void Main(string[] args)
         {
+			using (var ctx = new CompanyContext())
+			{
+				ctx.Database.CreateIfNotExists();
+			}
+
             new PersistenceSpecification<Contact>(() => new CompanyContext())
-                .WithKey(x => x.ContactId)
                 .CheckProperty(x => x.Name, "Kris McGinnes")
                 .CheckProperty(x => x.Age, 29)
                 .CheckReference(x => x.Address, new Address())
