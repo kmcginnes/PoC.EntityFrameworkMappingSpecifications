@@ -26,15 +26,54 @@ namespace PoC.EntityFrameworkMappingSpecifications
         public PersistenceSpecification<TEntity> CheckProperty<TProperty>(Expression<Func<TEntity, TProperty>> property, object value)
         {
             var propertyName = GetPropertyName(property);
-
             var propertyInfo = typeof (TEntity).GetProperty(propertyName);
-
             _properties.Add(new Property(propertyInfo, value));
-
             return this;
         }
 
-        private static string GetPropertyName<TProperty>(Expression<Func<TEntity, TProperty>> property)
+        public void VerifyMappings()
+        {
+            try
+            {
+                Database.SetInitializer<CompanyContext>(null);
+
+                //int i = 0;
+                //for (;; i++)
+                //{
+
+                //}
+
+                using (new TransactionScope())
+                {
+                    int id;
+                    using (var ctx = _createContext())
+                    {
+                        ctx.Database.CreateIfNotExists();
+                        var expected = CreateEntity();
+                        SetPropertiesOnEntity(expected);
+
+                        SaveEntityToDb(ctx, expected);
+                        id = GetKeyValue(expected);
+                    }
+
+                    using (var ctx = _createContext())
+                    {
+                        var actual = GetActualEntity(ctx, id);
+                        AssertPropertyValues(actual);
+                    }
+
+                    throw new Exception();
+                }
+            }
+            catch (Exception)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Rolling back all transactions");
+                Console.ResetColor();
+            }
+        }
+
+        private string GetPropertyName<TProperty>(Expression<Func<TEntity, TProperty>> property)
         {
             var expression = property.Body as MemberExpression;
             if (expression == null || expression.Expression != property.Parameters[0]
@@ -45,25 +84,6 @@ namespace PoC.EntityFrameworkMappingSpecifications
             }
             var propertyName = expression.Member.Name;
             return propertyName;
-        }
-
-        public void VerifyMappings()
-        {
-            Database.SetInitializer<CompanyContext>(null);
-            using (var ctx = _createContext())
-            {
-                ctx.Database.CreateIfNotExists();
-                var expected = CreateEntity();
-                SetPropertiesOnEntity(expected);
-                SaveEntityToDb(ctx, expected);
-
-                var id = GetKeyValue(expected);
-                if (id == default(int)) return;
-
-                var actual = GetActualEntity(ctx, id);
-                AssertPropertyValues(actual);
-                Cleanup(ctx, id);
-            }
         }
 
         private void AssertPropertyValues(TEntity actual)
@@ -79,6 +99,7 @@ namespace PoC.EntityFrameworkMappingSpecifications
         {
             Console.WriteLine("Creating db set");
             var dbSet = GetDbSet(ctx);
+
             try
             {
                 Console.WriteLine("Adding instance to db set");
@@ -96,6 +117,7 @@ namespace PoC.EntityFrameworkMappingSpecifications
                     Console.WriteLine(baseException.Message);
                     Console.ResetColor();
                 }
+                throw;
             }
         }
 
@@ -103,13 +125,13 @@ namespace PoC.EntityFrameworkMappingSpecifications
         {
             foreach (var property in _properties)
             {
-                Console.WriteLine("Setting value {0} on property {1}", property.Value,
-                                  property.PropertyInfo.Name);
+                Console.WriteLine("Setting value {0} on property {1}",
+                    property.Value, property.PropertyInfo.Name);
                 property.SetValueOn(expected);
             }
         }
 
-        private static TEntity CreateEntity()
+        private TEntity CreateEntity()
         {
             Console.WriteLine("Creating instance of {0}", typeof (TEntity).Name);
             var expected = Activator.CreateInstance<TEntity>();
@@ -121,23 +143,13 @@ namespace PoC.EntityFrameworkMappingSpecifications
             return (int)_keyPropertyInfo.GetValue(expected);
         }
 
-        private static void Cleanup(DbContext ctx, int id)
-        {
-            var dbSet = GetDbSet(ctx);
-            var actual = GetActualEntity(ctx, id);
-            Console.WriteLine("Removing instance from db set");
-            dbSet.Remove(actual);
-            Console.WriteLine("Saving changes to database");
-            ctx.SaveChanges();
-        }
-
-        private static TEntity GetActualEntity(DbContext ctx, int id)
+        private TEntity GetActualEntity(DbContext ctx, int id)
         {
             var dbSet = GetDbSet(ctx);
             return dbSet.Find(id);
         }
 
-        private static DbSet<TEntity> GetDbSet(DbContext ctx)
+        private DbSet<TEntity> GetDbSet(DbContext ctx)
         {
             return ctx.Set<TEntity>();
         }
@@ -161,7 +173,7 @@ namespace PoC.EntityFrameworkMappingSpecifications
             public void AssertValue(TEntity actual)
             {
                 var actualValue = PropertyInfo.GetValue(actual);
-                if (actualValue != Value)
+                if (!actualValue.Equals(Value))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("Assertion failed! Expected: {0} Actual: {1}", Value, actualValue);
