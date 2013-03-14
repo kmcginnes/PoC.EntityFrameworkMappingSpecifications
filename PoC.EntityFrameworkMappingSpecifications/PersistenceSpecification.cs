@@ -1,13 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Entity;
+using System.Data.Entity.Migrations;
+using System.Data.SqlClient;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Transactions;
 
 namespace PoC.EntityFrameworkMappingSpecifications
 {
-    public class PersistenceSpecification<TEntity>
+    public class PersistenceSpecification<TEntity> 
+        where TEntity : class
     {
         private readonly Func<DbContext> _createContext;
         private readonly List<Property> _properties;
@@ -45,72 +49,128 @@ namespace PoC.EntityFrameworkMappingSpecifications
 
         public void VerifyMappings()
         {
+            Database.SetInitializer<CompanyContext>(null);
             using (var ctx = _createContext())
             {
-                using (var transaction = new TransactionScope())
+                ctx.Database.CreateIfNotExists();
+                var expected = CreateEntity();
+                SetPropertiesOnEntity(expected);
+                SaveEntityToDb(ctx, expected);
+
+                var id = GetKeyValue(expected);
+                if (id == default(int)) return;
+
+                var actual = GetActualEntity(ctx, id);
+                AssertPropertyValues(actual);
+                Cleanup(ctx, id);
+            }
+        }
+
+        private void AssertPropertyValues(TEntity actual)
+        {
+            foreach (var property in _properties)
+            {
+                Console.WriteLine("Verifying property value of {0} was sent to db", property.PropertyInfo.Name);
+                property.AssertValue(actual);
+            }
+        }
+
+        private void SaveEntityToDb(DbContext ctx, TEntity expected)
+        {
+            Console.WriteLine("Creating db set");
+            var dbSet = GetDbSet(ctx);
+            try
+            {
+                Console.WriteLine("Adding instance to db set");
+                dbSet.Add(expected);
+                Console.WriteLine("Saving changes to database");
+                ctx.SaveChanges();
+                Console.WriteLine("Entity saved with id {0}", GetKeyValue(expected));
+            }
+            catch (Exception exception)
+            {
+                var baseException = exception.GetBaseException();
+                if (baseException is SqlException)
                 {
-                    Console.WriteLine("Creating instance of {0}", typeof (TEntity).Name);
-                    var expected = Activator.CreateInstance<TEntity>();
-                    foreach (var property in _properties)
-                    {
-                        Console.WriteLine("Setting value {0} on property {1}", property._value,
-                                          property._propertyInfo.Name);
-                        property.SetValueOn(expected);
-                    }
-
-                    Console.WriteLine("Creating db set");
-                    var dbSet = ctx.Set(typeof (TEntity));
-                    Console.WriteLine("Adding instance to db set");
-                    dbSet.Add(expected);
-                    Console.WriteLine("Saving changes to database");
-                    ctx.SaveChanges();
-
-                    var actual = (TEntity) dbSet.Find(_keyPropertyInfo.GetValue(expected));
-                    foreach (var property in _properties)
-                    {
-                        Console.WriteLine("Verifying property value of {0} was sent to db", property._propertyInfo.Name);
-                        property.AssertValue(actual);
-                    }
-
-                    Console.WriteLine("Removing instance from db set");
-                    dbSet.Remove(expected);
-                    Console.WriteLine("Saving changes to database");
-                    ctx.SaveChanges();
-
-                    transaction.Complete();
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine(baseException.Message);
+                    Console.ResetColor();
                 }
             }
         }
 
+        private void SetPropertiesOnEntity(TEntity expected)
+        {
+            foreach (var property in _properties)
+            {
+                Console.WriteLine("Setting value {0} on property {1}", property.Value,
+                                  property.PropertyInfo.Name);
+                property.SetValueOn(expected);
+            }
+        }
+
+        private static TEntity CreateEntity()
+        {
+            Console.WriteLine("Creating instance of {0}", typeof (TEntity).Name);
+            var expected = Activator.CreateInstance<TEntity>();
+            return expected;
+        }
+
+        private int GetKeyValue(TEntity expected)
+        {
+            return (int)_keyPropertyInfo.GetValue(expected);
+        }
+
+        private static void Cleanup(DbContext ctx, int id)
+        {
+            var dbSet = GetDbSet(ctx);
+            var actual = GetActualEntity(ctx, id);
+            Console.WriteLine("Removing instance from db set");
+            dbSet.Remove(actual);
+            Console.WriteLine("Saving changes to database");
+            ctx.SaveChanges();
+        }
+
+        private static TEntity GetActualEntity(DbContext ctx, int id)
+        {
+            var dbSet = GetDbSet(ctx);
+            return dbSet.Find(id);
+        }
+
+        private static DbSet<TEntity> GetDbSet(DbContext ctx)
+        {
+            return ctx.Set<TEntity>();
+        }
+
         public class Property
         {
-            public readonly PropertyInfo _propertyInfo;
-            public readonly object _value;
+            public PropertyInfo PropertyInfo { get; private set; }
+            public object Value { get; private set; }
 
             public Property(PropertyInfo propertyInfo, object value)
             {
-                _propertyInfo = propertyInfo;
-                _value = value;
+                PropertyInfo = propertyInfo;
+                Value = value;
             }
 
             public void SetValueOn(TEntity instance)
             {
-                _propertyInfo.SetValue(instance, _value);
+                PropertyInfo.SetValue(instance, Value);
             }
 
             public void AssertValue(TEntity actual)
             {
-                var actualValue = _propertyInfo.GetValue(actual);
-                if (actualValue != _value)
+                var actualValue = PropertyInfo.GetValue(actual);
+                if (actualValue != Value)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Assertion failed! Expected: {0} Actual: {1}", _value, actualValue);
+                    Console.WriteLine("Assertion failed! Expected: {0} Actual: {1}", Value, actualValue);
                     Console.ResetColor();
                 }
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine("Assertion Succeeded! Expected: {0} Actual: {1}", _value, actualValue);
+                    Console.WriteLine("Assertion Succeeded! Expected: {0} Actual: {1}", Value, actualValue);
                     Console.ResetColor();
                 }
             }

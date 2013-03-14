@@ -9,14 +9,11 @@ namespace PoC.EntityFrameworkMappingSpecifications
     {
         static void Main(string[] args)
         {
-            using (var ctx = new CompanyContext())
-            {
-                new PersistenceSpecification<Contact>(() => new CompanyContext())
-                    .WithKey(x => x.ContactId)
-                    .CheckProperty(x => x.Name, "Kris McGinnes")
-                    .CheckProperty(x => x.Age, 29)
-                    .VerifyMappings();
-            }
+            new PersistenceSpecification<Contact>(() => new CompanyContext())
+                .WithKey(x => x.ContactId)
+                .CheckProperty(x => x.Name, "Kris McGinnes")
+                .CheckProperty(x => x.Age, 29)
+                .VerifyMappings();
             Console.WriteLine("Press any key to quit...");
             Console.ReadKey();
         }
